@@ -15,7 +15,7 @@ app = Flask(__name__)
 def start_scheduler():
     init_db()
     logger.info("Scheduler initialized")
-    schedule.every().day.at("09:35").do(update_opportunities)
+    schedule.every().day.at("10:15").do(update_opportunities)
     while True:
         schedule.run_pending()
         logger.info("Scheduler checked for pending tasks")

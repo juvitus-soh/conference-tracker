@@ -6,19 +6,24 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# RSS feeds with source sites, including LinkedIn placeholder
 RSS_FEEDS = {
     'data_science': [
-        'https://www.kdnuggets.com/feed',  # Valid RSS feed
-        'http://arxiv.org/rss/stat.ML',  # Valid arXiv feed
+        {'url': 'https://www.kdnuggets.com/feed', 'source_site': 'https://www.kdnuggets.com'},
+        {'url': 'https://arxiv.org/rss/stat.ML', 'source_site': 'https://arxiv.org'},
     ],
     'ethical_ai': [
-        'https://cacm.acm.org/feed/',  # Valid ACM feed
+        {'url': 'https://cacm.acm.org/feed/', 'source_site': 'https://cacm.acm.org'},
     ],
     'entrepreneurship': [
-        'https://techcrunch.com/feed/',  # Valid TechCrunch feed
+        {'url': 'https://techcrunch.com/feed/', 'source_site': 'https://techcrunch.com'},
     ],
     'computer_engineering': [
-        'https://queue.acm.org/rss/feeds/queuecontent.xml',  # Valid ACM Queue feed
+        {'url': 'https://queue.acm.org/rss/feeds/queuecontent.xml', 'source_site': 'https://queue.acm.org'},
+    ],
+    'all_domains': [  # LinkedIn placeholder
+        {'url': 'https://rss.app/feeds/your-linkedin-feed-id.xml',  # Replace with actual RSS URL
+         'source_site': 'https://www.linkedin.com'},
     ]
 }
 
@@ -27,7 +32,9 @@ DOMAIN_KEYWORDS = {
     'ethical_ai': ['ethical ai', 'ai ethics', 'responsible ai', 'fairness in ai', 'bias in ai', 'ai governance'],
     'entrepreneurship': ['startups', 'entrepreneurship', 'venture capital', 'business ideas', 'innovation'],
     'computer_engineering': ['computer science', 'software engineering', 'computer engineering', 'programming',
-                             'algorithms']
+                             'algorithms'],
+    'all_domains': ['conference', 'workshop', 'summit', 'data science', 'ai', 'ethics', 'startup', 'engineering']
+    # Broader for LinkedIn
 }
 
 OPPORTUNITY_KEYWORDS = ['conference', 'symposium', 'workshop', 'summit', 'call for papers', 'submit a talk',
@@ -38,34 +45,30 @@ FUNDING_KEYWORDS = ['fully funded', 'scholarships available', 'travel grants', '
 def update_opportunities():
     logger.info("Starting opportunity update")
     for domain, feeds in RSS_FEEDS.items():
-        for feed_url in feeds:
+        for feed in feeds:
+            feed_url = feed['url']
+            source_site = feed['source_site']
             try:
                 logger.info(f"Parsing feed: {feed_url}")
-                feed = feedparser.parse(feed_url)
-                if feed.bozo:
-                    logger.error(f"Feed {feed_url} is malformed: {feed.bozo_exception}")
+                feed_data = feedparser.parse(feed_url)
+                if feed_data.bozo:
+                    logger.error(f"Feed {feed_url} is malformed: {feed_data.bozo_exception}")
                     continue
-                for entry in feed.entries:
+                for entry in feed_data.entries:
                     title = entry.get('title', '')
                     description = entry.get('description', entry.get('summary', ''))
                     link = entry.get('link', '')
                     pub_date = entry.get('published', entry.get('updated', datetime.now().isoformat()))
 
                     text = (title + ' ' + description).lower()
-                    if any(keyword in text for keyword in DOMAIN_KEYWORDS[domain]):
-                        opportunity_type = []
-                        if any(keyword in text for keyword in OPPORTUNITY_KEYWORDS):
-                            opportunity_type.append('conference')
-                        if 'call for papers' in text or 'submit a talk' in text:
-                            opportunity_type.append('speaker')
-                        if 'registration' in text:
-                            opportunity_type.append('attendee')
+                    logger.info(f"Feed entry: {title} - {description[:100]}")
 
-                        if opportunity_type:
-                            fully_funded = 1 if any(keyword in text for keyword in FUNDING_KEYWORDS) else 0
-                            opportunity_type_str = ','.join(opportunity_type)
-                            add_opportunity(title, description, link, domain, opportunity_type_str, fully_funded,
-                                            pub_date)
-                            logger.info(f"Added opportunity: {title}")
+                    if any(keyword in text for keyword in DOMAIN_KEYWORDS[domain]):
+                        opportunity_type = ['conference']  # Default for testing
+                        fully_funded = 1 if any(keyword in text for keyword in FUNDING_KEYWORDS) else 0
+                        opportunity_type_str = ','.join(opportunity_type)
+                        add_opportunity(title, description, link, domain, opportunity_type_str, fully_funded, pub_date,
+                                        source_site)
+                        logger.info(f"Added opportunity: {title}")
             except Exception as e:
                 logger.error(f"Error parsing {feed_url}: {e}")
