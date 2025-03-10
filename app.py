@@ -4,26 +4,31 @@ from threading import Thread
 from flask import Flask, render_template
 from database import init_db, get_opportunities
 from feed_parser import update_opportunities
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# Initialize database and start scheduler
 def start_scheduler():
     init_db()
-    schedule.every().day.at("00:00").do(update_opportunities)  # Update daily at midnight
+    logger.info("Scheduler initialized")
+    schedule.every().day.at("09:35").do(update_opportunities)
     while True:
         schedule.run_pending()
-        time.sleep(60)  # Check every minute
+        logger.info("Scheduler checked for pending tasks")
+        time.sleep(60)
 
-# Run scheduler in a separate thread
 scheduler_thread = Thread(target=start_scheduler, daemon=True)
 scheduler_thread.start()
 
 @app.route('/')
 def index():
     opportunities = get_opportunities()
-    # Sort by fully_funded (descending) and then date
     opportunities.sort(key=lambda x: (-x['fully_funded'], x['date']))
+    logger.info(f"Retrieved {len(opportunities)} opportunities")
     return render_template('index.html', opportunities=opportunities)
 
 if __name__ == '__main__':

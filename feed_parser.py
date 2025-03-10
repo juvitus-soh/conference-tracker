@@ -1,32 +1,30 @@
 import feedparser
 from database import add_opportunity
 from datetime import datetime
+import logging
 
-# RSS feeds for your domains (add more as needed)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 RSS_FEEDS = {
     'data_science': [
-        'https://www.datasciencecentral.com/page/news-feeds',  # Data Science Central
-        'https://www.kdnuggets.com/feed',  # KDNuggets
-        'http://arxiv.org/rss/stat.ML',  # arXiv Machine Learning
+        'https://www.kdnuggets.com/feed',  # Valid RSS feed
+        'http://arxiv.org/rss/stat.ML',  # Valid arXiv feed
     ],
     'ethical_ai': [
-        'https://www.artificial-intelligence.blog/rss-feeds/ai.xml',  # AI Blog
-        'https://cacm.acm.org/feed/',  # ACM Communications
+        'https://cacm.acm.org/feed/',  # Valid ACM feed
     ],
     'entrepreneurship': [
-        'https://www.entrepreneur.com/page/215927',  # Entrepreneur.com
-        'https://techcrunch.com/feed/',  # TechCrunch
+        'https://techcrunch.com/feed/',  # Valid TechCrunch feed
     ],
     'computer_engineering': [
-        'https://ieeetv.ieee.org/rssfeeds',  # IEEE Spectrum
-        'https://queue.acm.org/rss/feeds/queuecontent.xml',  # ACM Queue
+        'https://queue.acm.org/rss/feeds/queuecontent.xml',  # Valid ACM Queue feed
     ]
 }
 
-# Keywords for filtering
 DOMAIN_KEYWORDS = {
-    'data_science': ['data science', 'machine learning', 'AI', 'deep learning', 'data analytics', 'statistics'],
-    'ethical_ai': ['ethical AI', 'AI ethics', 'responsible AI', 'fairness in AI', 'bias in AI', 'AI governance'],
+    'data_science': ['data science', 'machine learning', 'ai', 'deep learning', 'data analytics', 'statistics'],
+    'ethical_ai': ['ethical ai', 'ai ethics', 'responsible ai', 'fairness in ai', 'bias in ai', 'ai governance'],
     'entrepreneurship': ['startups', 'entrepreneurship', 'venture capital', 'business ideas', 'innovation'],
     'computer_engineering': ['computer science', 'software engineering', 'computer engineering', 'programming',
                              'algorithms']
@@ -38,20 +36,23 @@ FUNDING_KEYWORDS = ['fully funded', 'scholarships available', 'travel grants', '
 
 
 def update_opportunities():
+    logger.info("Starting opportunity update")
     for domain, feeds in RSS_FEEDS.items():
         for feed_url in feeds:
             try:
+                logger.info(f"Parsing feed: {feed_url}")
                 feed = feedparser.parse(feed_url)
+                if feed.bozo:
+                    logger.error(f"Feed {feed_url} is malformed: {feed.bozo_exception}")
+                    continue
                 for entry in feed.entries:
                     title = entry.get('title', '')
                     description = entry.get('description', entry.get('summary', ''))
                     link = entry.get('link', '')
                     pub_date = entry.get('published', entry.get('updated', datetime.now().isoformat()))
 
-                    # Check if relevant to domain
                     text = (title + ' ' + description).lower()
                     if any(keyword in text for keyword in DOMAIN_KEYWORDS[domain]):
-                        # Determine opportunity type
                         opportunity_type = []
                         if any(keyword in text for keyword in OPPORTUNITY_KEYWORDS):
                             opportunity_type.append('conference')
@@ -61,12 +62,10 @@ def update_opportunities():
                             opportunity_type.append('attendee')
 
                         if opportunity_type:
-                            # Check funding status
                             fully_funded = 1 if any(keyword in text for keyword in FUNDING_KEYWORDS) else 0
                             opportunity_type_str = ','.join(opportunity_type)
-
-                            # Store in database
                             add_opportunity(title, description, link, domain, opportunity_type_str, fully_funded,
                                             pub_date)
+                            logger.info(f"Added opportunity: {title}")
             except Exception as e:
-                print(f"Error parsing {feed_url}: {e}")
+                logger.error(f"Error parsing {feed_url}: {e}")
